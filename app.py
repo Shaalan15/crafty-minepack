@@ -26,6 +26,49 @@ def root_proxy():
     except Exception as e:
         return f"Error proxying to port 8100: {e}", 502
 
+@app.route('/<string:server_name>/<string:action>')
+def action_server(server_name, action):
+    try:
+        # Try to login first
+        auth_url = f"{api_url}/auth/login"
+        auth_payload = {
+            "username": "shaalan",
+            "password": "Qfwm3772"
+        }
+        auth_response = requests.post(auth_url, json=auth_payload, verify=False)
+        if auth_response.status_code != 200:
+            abort(500, "Failed to login")
+
+        auth_json = auth_response.json()
+
+        token = auth_json["data"]["token"]
+
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        api_response = requests.get(f"{api_url}/servers", headers=headers, verify=False)
+
+        if api_response.status_code != 200:
+            abort(502, "Metadata API error")
+
+        api_json = api_response.json()
+
+        requested_server = next((server for server in api_json["data"] if str(server["server_name"]).lower() == str(server_name).lower()), None)
+
+        if not requested_server:
+            abort(404, "Server not found")
+
+        server_id = requested_server["server_id"]
+
+        action_response = requests.post(f"{api_url}/servers/{server_id}/action/{action}", headers=headers, verify=False)
+
+        # Step 2: Serve the file
+        return action_response.json(), 200
+
+    except Exception as e:
+        return f"Internal error: {e}", 500
+
 @app.route('/<string:server_name>/eu.pb4.polymer.autohost/main.zip')
 def serve_file(server_name):
     try:
